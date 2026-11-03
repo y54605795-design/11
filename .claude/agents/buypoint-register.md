@@ -11,52 +11,49 @@ description: 챠트보이 매매노트에 매수타점(돌파 매수 라인)·�
 | 곳 | 내용 | 다루는 방법 |
 |---|---|---|
 | 매매노트 앱 (원본) | https://claude.ai/artifact/7uwT3kviJwySfGKPBvvihi · 컬렉션 `stocks` · 문서 ID h01…, s01…, w01… | `ArtifactData` 도구 |
-| 백업 | jindori 저장소 main 가지 `chartboy-notes/stocks.json`, `stocks.csv`(UTF-8 BOM), `README.md` | `register.py apply`가 맞춘다 |
-| PC 감시 파일 | jindori 저장소 market-data 가지 `notes/chartboy_notes.json` (종목코드 포함, PC 감시가 아침 8시에 받아 감) | `register.py apply`가 맞춘다 |
-| 최근 시세 | market-data 가지 `market_data/YYYY/YYYYMMDD.csv` (code, name, close 등) | `register.py find`가 읽는다 |
+| 백업 | jindori 저장소 main 가지 `chartboy-notes/stocks.json`, `stocks.csv`(UTF-8 BOM), `README.md` | `register.py apply` |
+| PC 감시 파일 | jindori 저장소 market-data 가지 `notes/chartboy_notes.json` (종목코드 포함, PC 감시가 아침 8시에 받아 감) | `register.py apply` |
+| 최근 시세 | market-data 가지 `market_data/YYYY/YYYYMMDD.csv` | `register.py find` |
+
+아래에서 `R`은 `/home/user/jindori`에서 실행하는 `python3 chartboy-notes/register.py`, `$S`는 시스템이 알려 준 스크래치패드 폴더다.
 
 ## 준비
 
-1. jindori 저장소가 `/home/user/jindori`에 없으면 `git clone https://github.com/y54605795-design/jindori.git /home/user/jindori`. 접근이 거부되면 `add_repo` 도구(owner `y54605795-design`, repo `jindori`, access `push`)로 붙인 뒤 다시 받는다.
-2. 있으면 `cd /home/user/jindori && git pull -q --ff-only origin main`.
-3. `ArtifactData` 도구가 목록에 없으면 `ToolSearch`로 `select:ArtifactData`를 불러온다.
-4. 임시 파일은 시스템이 알려 준 스크래치패드 폴더에 둔다 (아래 `$S`).
+1. `/home/user/jindori`가 없으면 `git clone https://github.com/y54605795-design/jindori.git /home/user/jindori`. 접근이 거부되면 `add_repo` 도구(owner `y54605795-design`, repo `jindori`, access `push`)로 붙인 뒤 다시 받는다. 있으면 `git -C /home/user/jindori pull -q --ff-only origin main`.
+2. `ArtifactData` 도구가 목록에 없으면 `ToolSearch`로 `select:ArtifactData`를 불러온다.
 
 ## 절차
 
-**1. 요청 정리.** 종목마다 이름, 1차 타점, 2차 타점(있으면), 날짜(없으면 오늘, 한국 시각), 출처(예: "매수타점 체크 (11/3 전달)")를 뽑는다.
+**1. 요청 정리.** 종목마다 이름, 1차 타점, 2차 타점(있으면), 날짜(없으면 오늘, 한국 시각), 출처를 뽑는다.
 - `26.300원`처럼 점은 천 단위 구분이다 → 26,300원.
-- 가격 대신 모양만 있으면(예: "하이웨이브캔들") 최근 시세 파일에서 그 봉을 찾아 고가를 타점으로 쓰고, 어느 날 봉인지(시가·고가·저가·종가) 이유에 적는다. 어느 봉인지 확실하지 않으면 쓰지 않고 질문으로 돌려준다.
+- 출처: 사용자가 챠트보이 목록·영상·노트를 붙여 넣었으면 그 이름(예: "매수타점 체크 (11/3 전달)"), 사용자가 직접 정한 타점이면 비워 둔다 → 스크립트가 "사용자 요청 (M/D)"로 채운다.
+- 가격 대신 모양만 있으면(예: "하이웨이브캔들") 최근 시세 파일에서 그 봉을 찾아 고가를 타점으로 쓰고, 어느 날 봉인지(시가·고가·저가·종가)를 `--extra` 설명으로 넣는다. 어느 봉인지 확실하지 않으면 쓰지 않고 질문으로 돌려준다.
 
-**2. 종목코드 찾기와 중복 확인 — 반드시 코드로.** `python3 chartboy-notes/register.py find 이름1 이름2 …`
+**2. 앱 전체 받기.** `ArtifactData` list — collection `stocks`, `query.limit` 1000, `out_dir`는 **매번 새 빈 폴더** `$S/db_<시각>_a` (예: `$S/db_0950_a`). 결과 글에 문서마다 version이 나온다.
+
+**3. 종목코드 찾기와 중복 확인.** `R find --db-dir $S/db_…_a 이름1 이름2 …`
 - `exact: true`이고 후보가 하나면 그 코드를 쓴다. 이름 표기가 달라도(상신EDP = 상신이디피) 코드가 같으면 같은 종목이다.
 - 후보가 없거나 여럿이면 **아무것도 쓰지 말고** 후보 목록(코드·이름·종가)을 붙여 어느 종목인지 묻는 말로 끝낸다.
-- `existing`에 이미 있는 종목이면 새 문서를 만들지 않고 그 문서를 고친다(3-나).
+- `existing`에 `where: "앱"`인 문서가 있으면 그 문서를 고친다(4-나). "감시 파일에만"·"백업에만"이면 앱에서 지운 종목일 수 있으니 새로 만들지 말고 질문으로 돌려준다.
 
-**3. 앱(원본)에 쓰기.** 먼저 전체를 내려받는다: `ArtifactData` list, collection `stocks`, `query.limit` 1000, `out_dir` `$S/db_before`.
+**4. 앱에 쓸 문서 만들기 — 문구는 직접 쓰지 말고 스크립트로.**
 
-가. **새 종목** — ID는 `python3 chartboy-notes/register.py next-id --db-dir $S/db_before` (지운 번호도 다시 쓰지 않는다). `set`으로 아래 틀을 그대로 채운다(if_version 없이).
+가. 새 종목: `R next-id --db-dir $S/db_…_a` 로 ID를 받고,
+`R draft new --name "<시세 파일의 정식 이름>" --line <1차> [--line2 <2차>] [--date YYYY-MM-DD] [--source "<출처>"] [--extra "<설명>"] --out $S/<ID>.json`
+→ `ArtifactData` `set` (collection `stocks`, doc_id ID, `file_path` 그 파일, if_version 없이).
 
-    {"name": "<시세 파일의 정식 이름>", "status": "watch", "buyLine": <1차 타점 숫자>, "buyPrice": null,
-     "buyDate": "<M/D(요일)> 타점 제시", "buyReason": "[<출처 짧게> <M/D>] 타점 <1차 가격>원 돌파 시 매수.<모양 설명이 있으면 덧붙임>",
-     "cautions": "시초가부터 타점 위에서 시작(갭 돌파)하면 매수하지 않음. 이미 라인 위에 있으면 내려왔다 다시 넘을 때 알림.",
-     "source": "<출처>", "createdAt": "<YYYY-MM-DD>T00:00:00.000Z", "exitRules": [], "currentPrice": null, "priceAt": null,
-     "reentryLine": null, "sellDate": "", "sellPrice": null, "sellReason": "", "stopPrice": null}
+나. 이미 있는 종목: `R draft update --db-dir $S/db_…_a --id <ID> --line <가격> [--line2 …] [--date …] [--source …] [--extra …] --out $S/<ID>.json`
+- 스크립트가 상태에 맞춰 만든다: 매수 대기 → 타점·날짜·이유(이전 타점 기록 포함)·주의 첫머리 "[M/D 타점 변경]"·출처, 매도 완료 → 재진입 라인, 보유 → 건드리지 않음.
+- 종료 코드 3이면 쓰지 않는다(이미 같은 가격이거나 보유 종목). 출력된 `skip` 문구를 보고서에 적는다.
+- 아니면 `ArtifactData` `get`으로 그 문서의 지금 version을 읽고, `update` (`file_path` 그 파일 = 바뀌는 칸만, `if_version` 읽은 version).
 
-   2차 타점이 있으면 buyReason에 "(2차 타점 <가격>원)"을, cautions 앞에 "앱 알림은 1차 타점 <가격>원 기준. 2차 <가격>원도 직접 확인."을 넣는다.
+**5. 백업·감시 파일 맞추기.** 다시 앱 전체를 **새 빈 폴더** `$S/db_<시각>_b`에 받는다. 먼저 시험:
 
-나. **이미 있는 종목** — `get`으로 읽고 `update`(if_version은 읽은 version)로 고친다.
-- status `watch`: `buyLine`을 새 1차 타점으로, `buyDate`를 새 날짜로. `buyReason`은 새 문장을 앞에 쓰고 끝에 "(이전 타점: <옛 날짜> <옛 가격>원 — <옛 이유 요약>)"을 남긴다. `source` 끝에 " · <출처>"를 붙인다. 가격이 같으면 고치지 말고 "이미 등록됨"으로 보고한다.
-- status `sold`: `reentryLine`을 새 가격으로 넣고(재진입 타점), `cautions` 끝에 "[<M/D>] 재진입 타점 <가격>원."을 덧붙인다. status는 바꾸지 않는다.
-- status `hold`: 고치지 말고 "보유 중인 종목이라 그대로 둠"으로 보고한다.
+    R apply --db-dir $S/db_…_b --ids <ID들,쉼표로> --code <새 ID>=<코드> … --dry-run
 
-**4. 백업·감시 파일 맞추기.** 다시 전체를 내려받는다(`out_dir` `$S/db_after`). 먼저 시험으로 돌려 본다.
+   바뀌는 칸(전후)과 개수가 의도와 맞는지 본다. 맞으면 `--dry-run`을 빼고, 이 세션이 커밋 메시지 끝에 붙이라고 알려 준 귀속 줄을 한 줄씩 `--trailer "<줄>"`로 넘겨 실행한다(알려 준 줄이 없으면 넘기지 않는다). 새 종목은 `--code`를 꼭 넘긴다. `--date`는 사용자가 날짜를 말했을 때만(없으면 매수 대기는 오늘로 들어간다).
 
-    python3 chartboy-notes/register.py apply --db-dir $S/db_after --ids <ID들,쉼표로> --code <ID>=<코드> … --date <ID>=<YYYY-MM-DD> … --dry-run
-
-   내용이 맞으면 `--dry-run`을 빼고, 이 세션이 커밋 메시지 끝에 붙이라고 알려 준 귀속 줄을 한 줄씩 `--trailer "<줄>"`로 넘겨 실행한다(알려 준 줄이 없으면 넘기지 않는다). 새 종목은 `--code`를 꼭 넘긴다. 이 스크립트가 main·market-data 두 가지에 올린다.
-
-**5. 보고 (한국어, 쉽게, 짧게).** 표 하나로:
+**6. 보고 (한국어, 쉽게, 짧게).** 표 하나로. 종목 이름은 앱 문서의 이름을 쓰고, 시세 파일 이름이 다르면 괄호에 함께 적는다.
 
 | 종목(코드) | 타점 | 최근 종가(날짜) | 타점까지 | 처리 |
 |---|---|---|---|---|
@@ -70,8 +67,9 @@ description: 챠트보이 매매노트에 매수타점(돌파 매수 라인)·�
 ## 지킬 것
 
 - 앱이 원본이다. 앱 쓰기가 실패하면 백업·감시 파일은 건드리지 말고 실패를 그대로 보고한다.
-- 중복은 이름이 아니라 **종목코드**로 확인한다.
-- 문서를 지우지 않는다. ID를 다시 쓰지 않는다.
+- 중복은 이름이 아니라 **종목코드**로 확인한다(`find`가 앱·감시 파일·백업을 함께 본다).
+- 문서를 지우지 않는다. ID는 `next-id`로만 정한다(지운 번호도 다시 쓰지 않음).
+- 앱 문서의 문구(이유·주의·출처)는 `draft`가 만든 그대로 쓴다. 손으로 고치지 않는다.
 - `jindori.env`, 텔레그램·키움·GitHub 토큰은 읽지도 올리지도 출력하지도 않는다.
-- `chartboy-notes/register.py`가 바꾸는 파일 말고는 저장소 파일을 고치지 않는다.
+- `register.py`가 바꾸는 파일 말고는 저장소 파일을 고치지 않는다.
 - 미국 주식처럼 6자리 국내 코드가 없는 종목은 앱에만 넣고, 감시 파일에는 들어가지 않는다고 보고한다.
